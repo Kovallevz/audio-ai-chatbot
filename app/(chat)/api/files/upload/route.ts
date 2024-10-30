@@ -12,9 +12,15 @@ const FileSchema = z.object({
     })
     .refine(
       (file) =>
-        ["image/jpeg", "image/png", "application/pdf"].includes(file.type),
+        [
+          "image/jpeg",
+          "image/png",
+          "application/pdf",
+          "audio/webm",
+          "audio/webm;codecs=opus"
+        ].includes(file.type),
       {
-        message: "File type should be JPEG, PNG, or PDF",
+        message: "File type should be JPEG, PNG, PDF, or Audio",
       },
     ),
 });
