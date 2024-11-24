@@ -1,9 +1,11 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import * as React from 'react'
+import { ChatRequestOptions, CreateMessage, Message } from 'ai'
+import { Dispatch, SetStateAction, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
+
 import { Button } from '@/components/ui/button'
 import {
     Form,
@@ -22,8 +24,6 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 
-import { ChatRequestOptions, CreateMessage, Message } from 'ai';
-import { Dispatch, SetStateAction } from 'react'
 
 
 const formSchema = z.object({
@@ -46,8 +46,8 @@ type Props = {
 }
 
 export default function ChatForm({ append, setMessages, setDialogId }: Props) {
-    const [isLoading, setIsLoading] = React.useState(false)
-    const [systemMessage, setSystemMessage] = React.useState<string | null>(null)
+    const [isLoading, setIsLoading] = useState(false)
+    const [systemMessage, setSystemMessage] = useState<string | null>(null)
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
