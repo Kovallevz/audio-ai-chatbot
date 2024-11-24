@@ -1,7 +1,7 @@
 'use client'
 
-import * as React from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
+import * as React from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { Button } from '@/components/ui/button'
@@ -22,7 +22,7 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 
-import { Attachment, ChatRequestOptions, CreateMessage, Message } from 'ai';
+import { ChatRequestOptions, CreateMessage, Message } from 'ai';
 import { Dispatch, SetStateAction } from 'react'
 
 

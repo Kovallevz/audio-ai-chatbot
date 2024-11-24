@@ -15,11 +15,9 @@ import { toast } from 'sonner';
 import WavEncoder from 'wav-encoder';
 
 import { ArrowUpIcon, PaperclipIcon, StopIcon, MicrophoneIcon } from './icons';
-import { PreviewAttachment } from './preview-attachment';
 import useWindowSize from './use-window-size';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
-import AudioPlayer from '../ui/audio-player';
 
 const suggestedActions = [
   {
