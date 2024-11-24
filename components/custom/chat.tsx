@@ -11,6 +11,7 @@ import { Model } from '@/lib/model';
 
 import { MultimodalInput } from './multimodal-input';
 import { Overview } from './overview';
+import StartForm from './start-form';
 
 export function Chat({
   id,
@@ -21,7 +22,9 @@ export function Chat({
   initialMessages: Array<Message>;
   selectedModelName: Model['name'];
 }) {
-  const { messages, handleSubmit, input, setInput, append, isLoading, stop } =
+  const [dialogId, setDialogId] = useState<string | null>(null)
+
+  const { messages, setMessages, handleSubmit, input, setInput, append, isLoading, stop } =
     useChat({
       body: { id, model: selectedModelName },
       initialMessages,
@@ -29,6 +32,7 @@ export function Chat({
         window.history.replaceState({}, '', `/chat/${id}`);
       },
     });
+
 
   const [messagesContainerRef, messagesEndRef] =
     useScrollToBottom<HTMLDivElement>();
@@ -40,38 +44,45 @@ export function Chat({
       <ChatHeader selectedModelName={selectedModelName} />
       <div
         ref={messagesContainerRef}
-        className="flex flex-col min-w-0 gap-6 flex-1 overflow-y-scroll"
+        className="flex flex-col min-w-0 gap-6 flex-1 overflow-y-auto"
       >
-        {messages.length === 0 && <Overview />}
-
-        {messages.map((message) => (
-          <PreviewMessage
-            key={message.id}
-            role={message.role}
-            content={message.content}
-            attachments={message.experimental_attachments}
-            toolInvocations={message.toolInvocations}
-          />
-        ))}
-
-        <div
-          ref={messagesEndRef}
-          className="shrink-0 min-w-[24px] min-h-[24px]"
-        />
+        {messages.length === 0 ? (
+          <StartForm append={append} setMessages={setMessages} setDialogId={setDialogId} />
+        ) : (
+          <>
+            {messages.map((message) => (
+              <PreviewMessage
+                key={message.id}
+                role={message.role}
+                content={message.content}
+                attachments={message.experimental_attachments}
+                toolInvocations={message.toolInvocations}
+              />
+            ))}
+            <div
+              ref={messagesEndRef}
+              className="shrink-0 min-w-[24px] min-h-[24px]"
+            />
+          </>
+        )}
       </div>
-      <form className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl">
-        <MultimodalInput
-          input={input}
-          setInput={setInput}
-          handleSubmit={handleSubmit}
-          isLoading={isLoading}
-          stop={stop}
-          attachments={attachments}
-          setAttachments={setAttachments}
-          messages={messages}
-          append={append}
-        />
-      </form>
+      {messages.length > 0 && (
+        <form className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl">
+          <MultimodalInput
+            dialogId={dialogId}
+            input={input}
+            setInput={setInput}
+            handleSubmit={handleSubmit}
+            isLoading={isLoading}
+            stop={stop}
+            attachments={attachments}
+            setAttachments={setAttachments}
+            messages={messages}
+            append={append}
+            setMessages={setMessages}
+          />
+        </form>
+      )}
     </div>
   );
 }

@@ -12,12 +12,14 @@ import React, {
   ChangeEvent,
 } from 'react';
 import { toast } from 'sonner';
+import WavEncoder from 'wav-encoder';
 
 import { ArrowUpIcon, PaperclipIcon, StopIcon, MicrophoneIcon } from './icons';
 import { PreviewAttachment } from './preview-attachment';
 import useWindowSize from './use-window-size';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
+import AudioPlayer from '../ui/audio-player';
 
 const suggestedActions = [
   {
@@ -33,6 +35,7 @@ const suggestedActions = [
 ];
 
 export function MultimodalInput({
+  dialogId,
   input,
   setInput,
   isLoading,
@@ -42,7 +45,9 @@ export function MultimodalInput({
   messages,
   append,
   handleSubmit,
+  setMessages,
 }: {
+  dialogId: string | null;
   input: string;
   setInput: (value: string) => void;
   isLoading: boolean;
@@ -60,7 +65,10 @@ export function MultimodalInput({
     },
     chatRequestOptions?: ChatRequestOptions
   ) => void;
+  setMessages: (messages: Message[] | ((messages: Message[]) => Message[])) => void;
 }) {
+  const [isAssistantLoading, setIsAssistantLoading] = useState(false)
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
 
@@ -159,6 +167,8 @@ export function MultimodalInput({
   const timerRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
 
+  const [chunks, setChunks] = useState<BlobPart[]>([]);
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -177,33 +187,34 @@ export function MultimodalInput({
       const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
 
-      // Сбрасываем и запускаем таймер с высокой точностью
+      setChunks([]);
+
       setRecordingTime(0);
       startTimeRef.current = Date.now();
 
       const updateTimer = () => {
-        const elapsed = (Date.now() - startTimeRef.current) / 1000; // Переводим в секунды
+        const elapsed = (Date.now() - startTimeRef.current) / 1000;
         setRecordingTime(elapsed);
         timerRef.current = requestAnimationFrame(updateTimer);
       };
 
       timerRef.current = requestAnimationFrame(updateTimer);
 
-      const chunks: BlobPart[] = [];
-
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
-          chunks.push(e.data);
+          setChunks((prevChunks) => [...prevChunks, e.data]);
         }
       };
 
       mediaRecorder.onstop = async () => {
-        const blob = new Blob(chunks, { type: 'audio/webm;codecs=opus' });
-        setAudioBlob(blob);
-        const url = URL.createObjectURL(blob);
+        const audioBlob = new Blob(chunks, { type: 'audio/webm; codecs=opus' });
+        setAudioBlob(audioBlob);
+        const wavBlob = await convertWebMToWav(audioBlob);
+        setAudioBlob(wavBlob);
+        const url = URL.createObjectURL(wavBlob);
         setAudioUrl(url);
 
-        if (blob.size < 100) {
+        if (wavBlob.size < 100) {
           toast.error('Запись не удалась. Пожалуйста, проверьте доступ к микрофону');
           setAudioBlob(null);
           setAudioUrl(null);
@@ -222,10 +233,27 @@ export function MultimodalInput({
     }
   };
 
-  const stopRecording = () => {
+  const convertWebMToWav = async (webmBlob: Blob): Promise<Blob> => {
+    const arrayBuffer = await webmBlob.arrayBuffer();
+    const audioData = await decodeAudioData(arrayBuffer);
+
+    const wavData = {
+      sampleRate: audioData.sampleRate,
+      channelData: [audioData.getChannelData(0)],
+    };
+
+    const wavBlob = await WavEncoder.encode(wavData);
+    return new Blob([wavBlob], { type: 'audio/wav' });
+  };
+
+  const decodeAudioData = async (arrayBuffer: ArrayBuffer): Promise<AudioBuffer> => {
+    const audioContext = new AudioContext();
+    return await audioContext.decodeAudioData(arrayBuffer);
+  };
+
+  const stopRecording = async () => {
     if (mediaRecorderRef.current && isRecording) {
       try {
-        // Останавливаем таймер
         if (timerRef.current !== null) {
           cancelAnimationFrame(timerRef.current);
           timerRef.current = null;
@@ -236,6 +264,20 @@ export function MultimodalInput({
           track.stop();
         });
         setIsRecording(false);
+
+        const audioBlob = new Blob(chunks, { type: 'audio/webm; codecs=opus' });
+        const wavBlob = await convertWebMToWav(audioBlob);
+        setAudioBlob(wavBlob);
+        const url = URL.createObjectURL(wavBlob);
+
+        setAudioUrl(url);
+
+        if (wavBlob.size < 100) {
+          toast.error('Запись не удалась. Пожалуйста, проверьте доступ к микрофону');
+          setAudioBlob(null);
+          setAudioUrl(null);
+          return;
+        }
       } catch (error) {
         console.error('Error stopping recording:', error);
         toast.error('Ошибка при остановке записи');
@@ -262,7 +304,6 @@ export function MultimodalInput({
         if (isPlaying) {
           audioRef.current.pause();
         } else {
-          // Сбрасываем прогресс при начале воспроизведения
           setAudioProgress(0);
           const playPromise = audioRef.current.play();
           if (playPromise !== undefined) {
@@ -291,6 +332,7 @@ export function MultimodalInput({
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
 
   const handleAudioSubmit = async (event: React.FormEvent) => {
+
     event.preventDefault();
 
     if ((!input && !audioBlob) || isLoading) return;
@@ -299,23 +341,69 @@ export function MultimodalInput({
       setIsLoadingAudio(true);
 
       if (audioBlob) {
-        const file = new File([audioBlob], 'voice-message.webm', { type: 'audio/webm' });
-        const attachment = await uploadFile(file);
+        const file = new File([audioBlob], 'sample.wav', { type: 'audio/wav' });
+        const formData = new FormData();
+        formData.append("file", file);
 
-        if (attachment) {
-          // Сначала добавляем сообщение пользователя
-          await append({
-            id: Date.now().toString(),
-            role: 'user',
-            content: input || '🎤 Voice message',
-            experimental_attachments: [attachment]
-          });
+        const data = formData.getAll("file");
 
-          // Очищаем состояния
-          setInput('');
-          setAttachments([]);
-          setAudioBlob(null);
-          setAudioUrl(null);
+        setMessages(messages => [...messages, {
+          id: Date.now().toString(),
+          role: 'user',
+          content: '',
+          toolInvocations: [
+            {
+              state: 'result',
+              toolCallId: 'audio_player',
+              args: { audioUrl },
+              result: { audioUrl },
+              toolName: 'audio_player'
+            }
+          ]
+        }])
+
+        setIsAssistantLoading(true)
+
+        handleSubmit(undefined, {
+          experimental_attachments: attachments,
+        });
+
+        setInput('');
+        setAttachments([]);
+        setAudioBlob(null);
+        setAudioUrl(null);
+
+        const chatResponse = await fetch(`http://127.0.0.1:5000/v2/chat/${dialogId}`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (chatResponse.ok) {
+          const audioData = await chatResponse.blob();
+          const audioUrl = URL.createObjectURL(audioData);
+
+          setMessages(messages => [
+            ...messages,
+            {
+              id: Date.now().toString(),
+              role: 'assistant',
+              content: '',
+              toolInvocations: [
+                {
+                  state: 'result',
+                  toolCallId: 'audio_player',
+                  args: { audioUrl },
+                  result: { audioUrl },
+                  toolName: 'audio_player'
+                }
+              ]
+            }
+          ]);
+          setIsAssistantLoading(false)
+          console.log("mimic response: ", audioData);
+        } else {
+          const error = await chatResponse.json();
+          toast.error(`Ошибка: ${error.message}`);
         }
       }
     } catch (error) {
@@ -329,7 +417,7 @@ export function MultimodalInput({
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.floor(seconds % 60);
-    const milliseconds = Math.floor((seconds % 1) * 100); // Получаем две цифры миллисекунд
+    const milliseconds = Math.floor((seconds % 1) * 100);
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(2, '0')}`;
   };
 
@@ -385,26 +473,6 @@ export function MultimodalInput({
         tabIndex={-1}
       />
 
-      {/* {(attachments.length > 0 || uploadQueue.length > 0) && (
-        <div className="flex flex-row gap-2 overflow-x-scroll">
-          {attachments.map((attachment) => (
-            <PreviewAttachment key={attachment.url} attachment={attachment} />
-          ))}
-
-          {uploadQueue.map((filename) => (
-            <PreviewAttachment
-              key={filename}
-              attachment={{
-                url: '',
-                name: filename,
-                contentType: '',
-              }}
-              isUploading={true}
-            />
-          ))}
-        </div>
-      )} */}
-
       {(isRecording || audioUrl) && (
         <div className="flex items-center gap-2 px-3 py-2 bg-secondary rounded-xl">
           {isRecording ? (
@@ -428,7 +496,6 @@ export function MultimodalInput({
                 onPlay={() => setAudioProgress(0)}
                 onLoadedMetadata={() => {
                   if (audioRef.current) {
-                    // Устанавливаем начальное значение прогресса
                     setAudioProgress(0);
                     audioRef.current.addEventListener('timeupdate', handleTimeUpdate, { passive: true });
                   }
@@ -504,7 +571,7 @@ export function MultimodalInput({
           }}
         />
 
-        {isLoading ? (
+        {isLoading || isAssistantLoading ? (
           <Button
             className="rounded-full p-1.5 h-fit absolute bottom-2 right-2 m-0.5"
             onClick={(event) => {
@@ -530,18 +597,6 @@ export function MultimodalInput({
             <ArrowUpIcon size={14} />
           </Button>
         )}
-
-        {/* <Button
-          className="rounded-full p-1.5 h-fit absolute bottom-2 right-10 m-0.5 dark:border-zinc-700"
-          onClick={(event) => {
-            event.preventDefault();
-            fileInputRef.current?.click();
-          }}
-          variant="outline"
-          disabled={isLoading}
-        >
-          <PaperclipIcon size={14} />
-        </Button> */}
 
         <Button
           className="rounded-full p-1.5 h-fit absolute bottom-2 right-10 m-0.5 dark:border-zinc-700"

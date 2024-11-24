@@ -8,6 +8,7 @@ import { ReactNode } from 'react';
 import { Markdown } from './markdown';
 import { PreviewAttachment } from './preview-attachment';
 import { Weather } from './weather';
+import AudioPlayer from '../ui/audio-player';
 
 export const Message = ({
   role,
@@ -27,7 +28,7 @@ export const Message = ({
       animate={{ y: 0, opacity: 1 }}
       data-role={role}
     >
-      <div className="flex gap-4 group-data-[role=user]/message:px-5 w-full group-data-[role=user]/message:w-fit group-data-[role=user]/message:ml-auto group-data-[role=user]/message:max-w-2xl group-data-[role=user]/message:py-3.5 group-data-[role=user]/message:bg-muted rounded-xl">
+      <div className="flex gap-4 group-data-[role=user]/message:px-5 w-full group-data-[role=user]/message:w-fit group-data-[role=user]/message:ml-auto rounded-xl">
         {role === 'assistant' && (
           <div className="size-8 flex items-center rounded-full justify-center ring-1 shrink-0 ring-border">
             <Sparkles className="size-4" />
@@ -48,13 +49,11 @@ export const Message = ({
                 if (state === 'result') {
                   const { result } = toolInvocation;
 
-                  return (
-                    <div key={toolCallId}>
-                      {toolName === 'getWeather' ? (
-                        <Weather weatherAtLocation={result} />
-                      ) : null}
-                    </div>
-                  );
+                  if (toolName === 'getWeather') {
+                    return <Weather key={toolCallId} weatherAtLocation={result} />;
+                  } else if (toolName === 'audio_player') {
+                    return <AudioPlayer key={toolCallId} audioUrl={result.audioUrl} />;
+                  }
                 } else {
                   return (
                     <div key={toolCallId} className="skeleton">
