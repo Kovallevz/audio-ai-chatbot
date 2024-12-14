@@ -213,7 +213,7 @@ export function MultimodalInput({
         setAudioUrl(url);
 
         if (wavBlob.size < 100) {
-          toast.error('Запись не удалась. Пожалуйста, проверьте доступ к микрофону');
+          toast.error('Recording failed. Please check microphone access');
           setAudioBlob(null);
           setAudioUrl(null);
           return;
@@ -227,7 +227,7 @@ export function MultimodalInput({
 
     } catch (error) {
       console.error('Error accessing microphone:', error);
-      toast.error('Не удалось получить доступ к микрофону');
+      toast.error('Failed to access the microphone');
     }
   };
 
@@ -271,14 +271,16 @@ export function MultimodalInput({
         setAudioUrl(url);
 
         if (wavBlob.size < 100) {
-          toast.error('Запись не удалась. Пожалуйста, проверьте доступ к микрофону');
+          toast.error('Recording failed. Please check microphone access');
           setAudioBlob(null);
           setAudioUrl(null);
           return;
         }
       } catch (error) {
         console.error('Error stopping recording:', error);
-        toast.error('Ошибка при остановке записи');
+        toast.error('Error stopping recording');
+      } finally {
+        setChunks([]);
       }
     }
   };
@@ -311,14 +313,14 @@ export function MultimodalInput({
               })
               .catch(error => {
                 console.error('Error playing audio:', error);
-                toast.error('Ошибка при воспроизведении аудио');
+                toast.error('Error playing audio');
               });
           }
         }
         setIsPlaying(!isPlaying);
       } catch (error) {
         console.error('Error handling play/pause:', error);
-        toast.error('Ошибка при управлении воспроизведением');
+        toast.error('Error handling play/pause');
       }
     }
   };
@@ -330,7 +332,6 @@ export function MultimodalInput({
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
 
   const handleAudioSubmit = async (event: React.FormEvent) => {
-
     event.preventDefault();
 
     if ((!input && !audioBlob) || isLoading) return;
@@ -401,12 +402,12 @@ export function MultimodalInput({
           console.log("mimic response: ", audioData);
         } else {
           const error = await chatResponse.json();
-          toast.error(`Ошибка: ${error.message}`);
+          toast.error(`Error: ${error.message}`);
         }
       }
     } catch (error) {
       console.error('Error in handleAudioSubmit:', error);
-      toast.error('Что-то пошло не так');
+      toast.error('Something went wrong');
     } finally {
       setIsLoadingAudio(false);
     }
@@ -500,7 +501,7 @@ export function MultimodalInput({
                 }}
                 onError={(e) => {
                   console.error('Audio error:', e);
-                  toast.error('Ошибка при воспроизведении аудио');
+                  toast.error('Error playing audio');
                 }}
               />
               <Button
